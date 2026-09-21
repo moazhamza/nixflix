@@ -27,6 +27,10 @@ let
         type = lib.types.attrs;
         default = { };
       };
+      virtualisation = lib.mkOption {
+        type = lib.types.attrs;
+        default = { };
+      };
       networking = lib.mkOption {
         type = lib.types.submodule {
           options.hostName = lib.mkOption {

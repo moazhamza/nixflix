@@ -44,6 +44,96 @@ let
   '';
 in
 {
+  profilarr-service-generation =
+    let
+      config = evalConfig [
+        {
+          nixflix = {
+            enable = true;
+            profilarr = {
+              enable = true;
+              apiKey = "0123456789abcdef0123456789abcdef";
+              connectors = [
+                {
+                  name = "Radarr";
+                  type = "radarr";
+                  url = "http://127.0.0.1:7878";
+                  apiKey = "radarr-secret";
+                  sync = {
+                    mediaManagement = {
+                      database = "Dictionarry";
+                      naming = "Radarr";
+                      qualityDefinitions = "Radarr";
+                      mediaSettings = "Radarr";
+                    };
+                    delayProfile = {
+                      database = "Dictionarry";
+                      profile = "Radarr";
+                    };
+                    qualityProfiles = [
+                      {
+                        database = "Dictionarry";
+                        profile = "2160p Remux";
+                      }
+                    ];
+                  };
+                }
+              ];
+            };
+          };
+        }
+      ];
+      generated = config.config;
+      container = generated.virtualisation.oci-containers.containers.profilarr;
+      databasesService = generated.systemd.services.profilarr-databases;
+      connectorsService = generated.systemd.services.profilarr-connectors;
+      hasExpectedDatabases =
+        generated.nixflix.profilarr.databases == [
+          {
+            name = "Dictionarry";
+            repositoryUrl = "https://github.com/Dictionarry-Hub/database";
+            syncStrategy = 60;
+            autoPull = true;
+            conflictStrategy = "override";
+          }
+          {
+            name = "trash-pcd";
+            repositoryUrl = "https://github.com/Dictionarry-Hub/trash-pcd";
+            syncStrategy = 1440;
+            autoPull = true;
+            conflictStrategy = "override";
+          }
+        ];
+      hasExpectedService =
+        container.image == "ghcr.io/dictionarry-hub/profilarr:2.2.0"
+        && container.ports == [ "0.0.0.0:6868:6868" ]
+        && databasesService.wantedBy == [ "multi-user.target" ];
+      hasExpectedSyncConfig =
+        lib.hasInfix "INSERT INTO arr_sync_media_management" connectorsService.script
+        && lib.hasInfix "INSERT INTO arr_sync_delay_profiles_config" connectorsService.script
+        && lib.hasInfix "INSERT INTO arr_sync_quality_profiles" connectorsService.script
+        && lib.hasInfix "SELECT id, 'on_pull'" connectorsService.script
+        && lib.hasInfix "WHERE name = 'Dictionarry'" connectorsService.script
+        && lib.hasInfix "2160p Remux" connectorsService.script;
+      # The entrypoint chowns /config to PUID:PGID, so the data directory must
+      # be owned by the profilarr user and the ids must come from it too.
+      dataDir = generated.systemd.tmpfiles.settings."10-profilarr"."/var/lib/profilarr".d;
+      containerUnit = generated.systemd.services.${container.serviceName};
+      hasExpectedOwnership =
+        dataDir.user == "profilarr"
+        && dataDir.group == "profilarr"
+        && generated.users.users.profilarr.isSystemUser
+        && generated.users.users.profilarr.group == "profilarr"
+        && generated.users.groups ? profilarr
+        && !(container.environment ? PUID)
+        && !(container.environment ? PGID)
+        && lib.hasInfix "id -u profilarr" containerUnit.preStart
+        && lib.hasInfix "id -g profilarr" containerUnit.preStart;
+    in
+    assertTest "profilarr-service-generation" (
+      hasExpectedDatabases && hasExpectedService && hasExpectedSyncConfig && hasExpectedOwnership
+    );
+
   # Test that nixflix.sonarr options generate correct systemd units
   sonarr-service-generation =
     let
@@ -61,6 +151,13 @@ in
                   password._secret = "/run/secrets/sonarr-pass";
                 };
                 apiKey._secret = "/run/secrets/sonarr-api";
+                releaseProfiles = [
+                  {
+                    name = "Extended/Superfan";
+                    required = [ "extended" ];
+                    tags = [ "extended" ];
+                  }
+                ];
                 rootFolders = [ { path = "/media/tv"; } ];
               };
             };
@@ -68,10 +165,17 @@ in
         }
       ];
       systemdUnits = config.config.systemd.services;
+      releaseProfilesService = systemdUnits.sonarr-releaseprofiles;
       hasAllServices =
-        systemdUnits ? sonarr && systemdUnits ? sonarr-config && systemdUnits ? sonarr-rootfolders;
+        systemdUnits ? sonarr
+        && systemdUnits ? sonarr-config
+        && systemdUnits ? sonarr-rootfolders
+        && systemdUnits ? sonarr-releaseprofiles;
+      hasReleaseProfile =
+        lib.hasInfix "Extended/Superfan" releaseProfilesService.script
+        && lib.hasInfix "releaseprofile" releaseProfilesService.script;
     in
-    assertTest "sonarr-service-generation" hasAllServices;
+    assertTest "sonarr-service-generation" (hasAllServices && hasReleaseProfile);
 
   # Test that nixflix.sonarr-anime options generate correct systemd units
   sonarr-anime-service-generation =

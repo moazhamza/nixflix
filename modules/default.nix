@@ -22,6 +22,7 @@ in
     ./notif
     ./options.nix
     ./postgres.nix
+    ./profilarr.nix
     ./prowlarr
     ./radarr.nix
     ./recyclarr

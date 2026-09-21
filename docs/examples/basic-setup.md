@@ -34,6 +34,7 @@ This example shows a working media server configuration based on a real producti
     "usenet/newsgroupdirect/username" = {};
     "usenet/newsgroupdirect/password" = {};
     "navidrome/password" = {};
+    "profilarr/api_key" = {};
   };
 
   nixflix = {
@@ -180,6 +181,11 @@ This example shows a working media server configuration based on a real producti
       };
     };
 
+    profilarr = {
+      enable = true;
+      apiKey._secret = config.sops.secrets."profilarr/api_key".path;
+    };
+
     vpn = {
       enable = true;
       wgConfFile = config.sops.secrets."wireguard/conf".path;
@@ -202,6 +208,7 @@ This example shows a working media server configuration based on a real producti
 - **SABnzbd** - Usenet downloads with 2 providers
 - **Jellyfin** - Media streaming with automatic library configuration
 - **Seerr** - Requests Management
+- **Profilarr** - Quality profile and custom format management using Dictionarry and TRaSH PCD
 - **WireGuard VPN** - Download protection via network namespace confinement
 - **Recyclarr** - TRaSH guides automation
 
@@ -256,6 +263,7 @@ This example shows a working media server configuration based on a real producti
     ├── lidarr/
     ├── navidrome/
     ├── postgres/
+    ├── profilarr/
     ├── prowlarr/
     ├── radarr/
     ├── seerr/
@@ -277,6 +285,7 @@ This example shows a working media server configuration based on a real producti
 | Jellyfin | `http://jellyfin.nixflix` | `http://localhost:8096` | `admin` |
 | Seerr | `http://seerr.nixflix` | `http://localhost:5055` | `seerr` (local), `admin` (Jellyfin auth) |
 | Navidrome | `http://navidrome.nixflix` | `http://localhost:4533` | `admin` |
+| Profilarr | `http://profilarr.nixflix` | `http://localhost:6868` | Configured during first-run setup |
 
 ## Customization
 
